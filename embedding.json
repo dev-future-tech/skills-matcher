@@ -1,0 +1,9 @@
+{
+  "id": "user-123",
+  "embedding": [0.123, -0.345, ...],
+  "metadata": {
+    "name": "Jane Doe",
+    "skills": ["Java", "Spring Boot", "Kubernetes"],
+    "role": "Backend Developer"
+  }
+}

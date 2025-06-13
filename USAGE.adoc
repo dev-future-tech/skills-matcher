@@ -1,0 +1,10 @@
+= Using this API
+:toc: right
+:author: Anthony Ikeda <anthony.ikeda@gmail.com>
+
+== Calling the Endpoints
+
+[source,bash,numbered]
+----
+$ http --print=HhBb POST http://localhost:8080/skills username=='Anthony Ikeda' < skills.json
+----

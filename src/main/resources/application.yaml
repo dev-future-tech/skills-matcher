@@ -1,0 +1,20 @@
+spring:
+  ai:
+    vectorstore:
+      milvus:
+        client:
+          host: localhost
+          port: 19530
+        database-name: "default"
+        collectionName: "skills_test"
+        embeddingDimension: 768
+        indexType: IVF_FLAT
+        metricType: L2
+        initialize-schema: true
+        index-parameters: {"nlist":1024}
+    openai:
+      api-key: 'blank'
+logging:
+  level:
+    org.springframework.ai: DEBUG
+    com.example.restservice.skills: DEBUG
