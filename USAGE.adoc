@@ -2,9 +2,128 @@
 :toc: right
 :author: Anthony Ikeda <anthony.ikeda@gmail.com>
 
+== Setup
+
+You will need:
+
+* Docker Runtime
+* https://lmstudio.ai[LM Studio]
+* https://milvus.io[Milvus]
+* https://github.com/zilliztech/attu[Attu]
+
+=== Starting Milvus
+
+This will be executed by running a docker compose script:
+
+[source,yaml,numbered]
+----
+version: '3.5'
+
+services:
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio:
+    container_name: milvus-minio
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  standalone:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.3.3
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+    - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/milvus:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - "etcd"
+      - "minio"
+
+networks:
+  default:
+    name: milvus
+----
+
+Execute the script with:
+
+[source,bash]
+----
+$ docker compose -f milvus-standalone-docker-compose.yml up -d
+----
+
+=== Running Attu
+
+Get the local ip address:
+
+[source,bash]
+----
+ifconfig -X en0
+en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+	options=6460<TSO4,TSO6,CHANNEL_IO,PARTIAL_CSUM,ZEROINVERT_CSUM>
+    ...
+	inet 192.168.0.9 netmask 0xffffff00 broadcast 192.168.0.255
+    ...
+	media: autoselect
+	status: active
+----
+
+Then run Attu in Docker:
+
+[source,bash]
+----
+$ docker run -p 8000:3000 -e MILVUS_URL=192.168.0.9:19530 zilliz/attu:v2.3.1
+WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+yarn run v1.22.19
+$ node dist/src/app.js
+Attu server started: http://172.17.0.2:3000
+----
+
+
 == Calling the Endpoints
 
 [source,bash,numbered]
 ----
 $ http --print=HhBb POST http://localhost:8080/skills username=='Anthony Ikeda' < skills.json
 ----
+
+
