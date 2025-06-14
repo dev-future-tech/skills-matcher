@@ -6,6 +6,7 @@ import io.milvus.v2.client.MilvusClientV2;
 import io.milvus.v2.service.vector.request.InsertReq;
 import io.milvus.v2.service.vector.request.SearchReq;
 import io.milvus.v2.service.vector.request.data.EmbeddedText;
+import io.milvus.v2.service.vector.request.data.FloatVec;
 import io.milvus.v2.service.vector.response.InsertResp;
 import io.milvus.v2.service.vector.response.SearchResp;
 import org.slf4j.Logger;
@@ -76,23 +77,35 @@ public class SkillsManager {
 
         Map<String, Object> searchParams = new HashMap<>();
         searchParams.put("drop_ratio_search", 0.2);
+
+        String query = String.format("Who has %s as a skill?", skill);
+        Embedding embeddedQuery = getEmbedding(new String[]{query});
+        logger.debug("Got embedding for query {}", embeddedQuery.getOutput());
+
         SearchReq searchRequest = SearchReq.builder()
                 .collectionName(COLLECTION_NAME)
-                .data(Collections.singletonList(new EmbeddedText(String.format("Who has the %s skill?", skill))))
+                .data(Collections.singletonList(new FloatVec(embeddedQuery.getOutput())))
                 .annsField("skills_embedding")
                 .topK(3)
                 .searchParams(searchParams)
                 .outputFields(outputFields).build();
+
+        List<SkilledPerson> skilledPersons = new ArrayList<>();
 
         SearchResp searchResp = milvusClient.search(searchRequest);
         List<List<SearchResp.SearchResult>> results = searchResp.getSearchResults();
         results.forEach(searchResults -> {
             searchResults.forEach(searchResult -> {
                 logger.info(searchResult.toString());
+                Map<String, Object> data = searchResult.getEntity();
+                SkilledPerson skilledPerson = new SkilledPerson();
+                skilledPerson.setUserId(data.get("user_id").toString());
+                skilledPerson.setSkills(data.get("skills").toString());
+                skilledPerson.setUsername(data.get("username").toString());
+                skilledPersons.add(skilledPerson);
             });
         });
 
-        List<SkilledPerson> skilledPersons = new ArrayList<>();
         return skilledPersons;
     }
 }
